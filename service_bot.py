@@ -1,11 +1,12 @@
 import pygsheets
+from settings import *
 
 
 # Клиент - главный класс для работы с Google-документами. При создании происходит авторизация
 client = pygsheets.authorize(service_file='key/python-waldorf-4f0f67808d79.json')
 
 # Открываем таблицу с помощью семейства методов open_<bla-bla-bla>
-table = client.open_by_key('1WeyL-_Eoj5UYAVyF6YjEbndDV8wXfg821iUA_R7C5YE')
+table = client.open_by_key(PRINTERS_GSHEET_KEY)
 
 # # Select worksheet by id, index, title.
 # wks = sh.worksheet_by_title("my test sheet")
