@@ -1,5 +1,6 @@
 import functools
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+import datetime
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
 from telegram.ext import Updater, CallbackContext, CommandHandler, MessageHandler, Filters, ConversationHandler
 from settings import BOT_TOKEN, ADMIN_IDS
 from log import get_logger
@@ -8,7 +9,7 @@ from gsheets_connector import Printers
 logger = get_logger(__name__)  # Создаем логгер для обработки событий. Сообщения DEBUG - только в консоль
 printers = Printers()  # Экземпляр класса Printers, в котором держатся страницы Реестра принтеров
 
-ROOM, DEVICE = range(2)  # Состояния для ConversationHandler
+FLOOR, ROOM, DEVICE, DATE, DONE = range(5)  # Состояния для ConversationHandler
 
 
 def run_service_bot() -> None:
@@ -21,19 +22,20 @@ def run_service_bot() -> None:
     dispatcher = updater.dispatcher
 
     help_handler = CommandHandler('help', do_help)
-    keyboard_handler = CommandHandler('keyboard', answer_with_keyboard)
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('change_cartridge', trigger_cartridge_change)],
+        entry_points=[CommandHandler('cartridge', cartridge_action)],
         states={
+            FLOOR: [MessageHandler(Filters.text, choose_floor)],  # TODO нужен фильтр на 5-4-3-2-1 и на Привоз
             ROOM: [MessageHandler(Filters.text, choose_room)],
-            DEVICE: [MessageHandler(Filters.text, choose_device)]
+            DEVICE: [MessageHandler(Filters.text, choose_device)],
+            DATE: [MessageHandler(Filters.text, choose_date)],
+            DONE: [MessageHandler(Filters.text, cartridge_done)],
         },
-        fallbacks=[]
+        fallbacks=[CommandHandler('cancel', cancel)]
     )
     message_handler = MessageHandler(Filters.all, do_echo)
 
     dispatcher.add_handler(help_handler)
-    dispatcher.add_handler(keyboard_handler)
     dispatcher.add_handler(conv_handler)
     dispatcher.add_handler(message_handler)
 
@@ -100,40 +102,23 @@ def do_help(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(text=reply_text)
 
 
-def answer_with_keyboard(update: Update, context: CallbackContext) -> None:
-    # Для клавиатуры нужна матрица (двумерный список) из текстовых элементов
-    # Каждый текстовый элемент - отдельная кнопка
-
-    button_list = [
-        [
-            'col1',
-            'col2',
-            'col3'
-        ],
-        [
-            'row2 col1',
-            'row2 col2'
-        ]
-    ]
-
-    # Теперь собираем кнопки в клавиатуру - объект ReplyKeyboardMarkup
-    # Для одной кнопки в строке можно использовать одномерный список и метод from_column
-    reply_markup = ReplyKeyboardMarkup(
-        button_list,  # список кнопок
-        resize_keyboard=True,  # сжимает кнопки по вертикали до высоты текста
-        one_time_keyboard=True  # убирает клавиатуру после нажатия на кнопку
-    )
-    update.message.reply_text("A three-column menu", reply_markup=reply_markup)
-
-
-def trigger_cartridge_change(update: Update, context: CallbackContext) -> int:
-    keyboard = ['5', '4', '3', '2', '1']
+def cartridge_action(update: Update, context: CallbackContext) -> int:
+    buttons = ['Замена', 'Привоз']
     reply_markup = ReplyKeyboardMarkup.from_column(
-        keyboard,
+        buttons,
         resize_keyboard=True,
-        one_time_keyboard=True
     )
+    update.message.reply_text('Что делаем с картриджами?', reply_markup=reply_markup)
 
+    return FLOOR
+
+
+def choose_floor(update: Update, context: CallbackContext) -> int:
+    buttons = ['5', '4', '3', '2', '1']
+    reply_markup = ReplyKeyboardMarkup.from_column(
+        buttons,
+        resize_keyboard=True,
+    )
     update.message.reply_text('Выберите этаж', reply_markup=reply_markup)
 
     return ROOM
@@ -141,31 +126,69 @@ def trigger_cartridge_change(update: Update, context: CallbackContext) -> int:
 
 def choose_room(update: Update, context: CallbackContext) -> int:
     floor_number = update.message.text
-    rooms = [room for room in printers.registry if room[0] == floor_number]
+    buttons = [room for room in printers.registry if room[0] == floor_number]
 
     reply_markup = ReplyKeyboardMarkup.from_column(
-        rooms,
+        buttons,
         resize_keyboard=True,
-        one_time_keyboard=True
     )
-
     update.message.reply_text('Выберите кабинет', reply_markup=reply_markup)
+
     return DEVICE
 
 
 def choose_device(update: Update, context: CallbackContext) -> int:
     room_number = update.message.text
     if len(printers.registry[room_number]) == 1:
-        update.message.reply_text(f'Замена картриджа в принтере {printers.registry[room_number]}')
+        printer_name = [key for key in printers.registry[room_number]][0]
+        update.message.reply_text(f'Замена картриджа в принтере {printer_name}', reply_markup=ReplyKeyboardRemove())
     else:
-        keyboard = [printer for printer in printers.registry[room_number]]
+        buttons = [printer for printer in printers.registry[room_number]]
         reply_markup = ReplyKeyboardMarkup.from_row(
-            keyboard,
+            buttons,
             resize_keyboard=True,
-            one_time_keyboard=True
         )
-
         update.message.reply_text('Выберите принтер', reply_markup=reply_markup)
+
+    return DATE
+
+
+def choose_date(update: Update, context: CallbackContext) -> int:
+    date_format = '%d.%m.%Y'
+    day = datetime.timedelta(days=1)
+    today = datetime.date.today()
+    yesterday = today - day
+
+    buttons = [today.strftime(date_format), yesterday.strftime(date_format)]
+    reply_markup = ReplyKeyboardMarkup.from_column(
+        buttons,
+        resize_keyboard=True,
+    )
+    update.message.reply_text(
+        'Выберите день\nили введите дату в формате ДД.ММ.ГГГГ', reply_markup=reply_markup
+    )
+
+    return DONE
+
+
+def cartridge_done(update: Update, context: CallbackContext) -> int:
+    # TODO реализовать занесение в таблицу и правильную запись в лог
+    logger.info('Заменили картридж')
+    update.message.reply_text(
+        'Замена картриджа учтена', reply_markup=ReplyKeyboardRemove()
+    )
+
+    return ConversationHandler.END
+
+
+def cancel(update: Update, context: CallbackContext) -> int:
+    user = update.message.from_user
+    chat_id = update.message.chat_id
+    logger.info(f'{chat_id=} {user.first_name} отменил команду')  # TODO вытащить предыдущую команду
+    update.message.reply_text(
+        'Ничего не делаем. Отмена', reply_markup=ReplyKeyboardRemove()
+    )
+
     return ConversationHandler.END
 
 
