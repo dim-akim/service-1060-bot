@@ -139,21 +139,30 @@ def choose_room(update: Update, context: CallbackContext) -> int:
 
 def choose_device(update: Update, context: CallbackContext) -> int:
     room_number = update.message.text
+    # TODO продумать структуру хренения элементов диалога
+    context.user_data['room'] = room_number
+    # TODO нужен рефакторинг
     if len(printers.registry[room_number]) == 1:
         printer_name = [key for key in printers.registry[room_number]][0]
         update.message.reply_text(f'Замена картриджа в принтере {printer_name}', reply_markup=ReplyKeyboardRemove())
+        context.user_data['printer'] = printer_name
+        choose_date(update, context)
+        return DONE
     else:
         buttons = [printer for printer in printers.registry[room_number]]
         reply_markup = ReplyKeyboardMarkup.from_row(
             buttons,
             resize_keyboard=True,
         )
+        context.user_data['printer'] = 1  # сигнал, что сюда надо записать название принтера в choose_date
         update.message.reply_text('Выберите принтер', reply_markup=reply_markup)
 
     return DATE
 
 
 def choose_date(update: Update, context: CallbackContext) -> int:
+    if context.user_data['printer'] == 1:
+        context.user_data['printer'] = update.message.text
     date_format = '%d.%m.%Y'
     day = datetime.timedelta(days=1)
     today = datetime.date.today()
@@ -165,7 +174,7 @@ def choose_date(update: Update, context: CallbackContext) -> int:
         resize_keyboard=True,
     )
     update.message.reply_text(
-        'Выберите день\nили введите дату в формате ДД.ММ.ГГГГ', reply_markup=reply_markup
+        'Выберите день или введите дату в формате ДД.ММ.ГГГГ', reply_markup=reply_markup
     )
 
     return DONE
@@ -173,9 +182,16 @@ def choose_date(update: Update, context: CallbackContext) -> int:
 
 def cartridge_done(update: Update, context: CallbackContext) -> int:
     # TODO реализовать занесение в таблицу и правильную запись в лог
-    logger.info('Заменили картридж')
+    room = context.user_data['room']
+    printer = context.user_data['printer']
+    date = update.message.text
+    username = update.message.from_user.username
+
+    logger.info(f'Замена: {username=} {room=} {printer=} {date=}')
+
+    message = f'Замена картриджа\nКабинет: {room}\nПринтер: {printer}\nДата: {date}'
     update.message.reply_text(
-        'Замена картриджа учтена', reply_markup=ReplyKeyboardRemove()
+        message, reply_markup=ReplyKeyboardRemove()
     )
 
     return ConversationHandler.END
