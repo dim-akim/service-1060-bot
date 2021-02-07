@@ -12,6 +12,48 @@ printers = Printers()  # Экземпляр класса Printers, в котор
 FLOOR, ROOM, DEVICE, DATE, DONE = range(5)  # Состояния для ConversationHandler
 
 
+def log_action(command):
+    """
+    Декоратор, который логирует все действия бота и возникающие ошибки
+    """
+
+    @functools.wraps(command)
+    def wrapper(*args, **kwargs):
+        try:
+            update = args[0]
+            username = update.message.from_user.username
+            logger.info(f'{username} вызвал функцию {command.__name__}')
+            return command(*args, **kwargs)
+        except:
+            logger.exception(f'Ошибка в обработчике {command.__name__}')
+            raise
+
+    return wrapper
+
+
+def admin_access(command):
+    """
+    Декоратор, который ограничивает доступ к команде только для chat_id, которые перечислены в ADMIN_IDS
+    """
+
+    @functools.wraps(command)
+    def wrapper(*args, **kwargs):
+        update = args[0]
+
+        if update and hasattr(update, 'message'):
+            chat_id = update.message.chat_id
+            username = update.message.from_user.username
+            if chat_id in ADMIN_IDS:
+                # print(f'Доступ разрешен для {chat_id=}')
+                return command(*args, **kwargs)
+            else:
+                logger.warning(f'Доступ запрещен для {chat_id=} {username=}')
+        else:
+            logger.error('Нет атрибута update.message')
+
+    return wrapper
+
+
 def run_service_bot() -> None:
     """
     Запускает бота help_admin_1060_bot
@@ -23,13 +65,28 @@ def run_service_bot() -> None:
 
     help_handler = CommandHandler('help', do_help)
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('cartridge', cartridge_action)],
-        states={
-            FLOOR: [MessageHandler(Filters.text, choose_floor)],  # TODO нужен фильтр на 5-4-3-2-1 и на Привоз
-            ROOM: [MessageHandler(Filters.text, choose_room)],
-            DEVICE: [MessageHandler(Filters.text, choose_device)],
-            DATE: [MessageHandler(Filters.text, choose_date)],
-            DONE: [MessageHandler(Filters.text, cartridge_done)],
+        entry_points=[CommandHandler('cartridge', cartridge_choose_action)],
+        states={  # TODO нужен фильтр на 5-4-3-2-1 и на Привоз
+            FLOOR: [
+                CommandHandler('cancel', cancel),
+                MessageHandler(Filters.text, cartridge_choose_floor),
+            ],
+            ROOM: [
+                CommandHandler('cancel', cancel),
+                MessageHandler(Filters.text, cartridge_choose_room),
+            ],
+            DEVICE: [
+                CommandHandler('cancel', cancel),
+                MessageHandler(Filters.text, cartridge_choose_device),
+            ],
+            DATE: [
+                CommandHandler('cancel', cancel),
+                MessageHandler(Filters.text, cartridge_choose_date),
+            ],
+            DONE: [
+                CommandHandler('cancel', cancel),
+                MessageHandler(Filters.text, cartridge_change_done),
+            ],
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -44,31 +101,11 @@ def run_service_bot() -> None:
     updater.idle()
 
 
-def admin_access(command):
-    """
-    Декоратор, который ограничивает доступ к команде только для chat_id, которые перечислены в ADMIN_IDS
-    """
-    @functools.wraps(command)
-    def wrapper(*args, **kwargs):
-        update = args[0]
-
-        if update and hasattr(update, 'message'):
-            chat_id = update.message.chat_id
-            if chat_id in ADMIN_IDS:
-                # print(f'Доступ разрешен для {chat_id=}')
-                return command(*args, **kwargs)
-            else:
-                logger.warning(f'Доступ запрещен для {chat_id=}')
-        else:
-            logger.error('Нет атрибута update.message')
-
-    return wrapper
-
-
 def start(update: Update, context: CallbackContext) -> None:
     pass
 
 
+@log_action
 def do_echo(update: Update, context: CallbackContext) -> None:
     """
     Отправляет в чат эхо: Не знаю, что это, наберите /help
@@ -82,6 +119,7 @@ def do_echo(update: Update, context: CallbackContext) -> None:
     )
 
 
+@log_action
 def do_help(update: Update, context: CallbackContext) -> None:
     """
 
@@ -102,51 +140,64 @@ def do_help(update: Update, context: CallbackContext) -> None:
     update.message.reply_text(text=reply_text)
 
 
-def cartridge_action(update: Update, context: CallbackContext) -> int:
+@log_action
+def cartridge_choose_action(update: Update, context: CallbackContext) -> int:
+
     buttons = ['Замена', 'Привоз']
-    reply_markup = ReplyKeyboardMarkup.from_column(
+    reply_markup = ReplyKeyboardMarkup.from_row(
         buttons,
         resize_keyboard=True,
     )
-    update.message.reply_text('Что делаем с картриджами?', reply_markup=reply_markup)
+    update.message.reply_text(
+        'Что делаем с картриджами?',
+        reply_markup=reply_markup
+    )
 
     return FLOOR
 
 
-def choose_floor(update: Update, context: CallbackContext) -> int:
-    buttons = ['5', '4', '3', '2', '1']
-    reply_markup = ReplyKeyboardMarkup.from_column(
+@log_action
+def cartridge_choose_floor(update: Update, context: CallbackContext) -> int:
+    buttons = ['1', '2', '3', '4', '5']
+    reply_markup = ReplyKeyboardMarkup.from_row(
         buttons,
         resize_keyboard=True,
     )
-    update.message.reply_text('Выберите этаж', reply_markup=reply_markup)
+    update.message.reply_text(
+        'Выберите этаж',
+        reply_markup=reply_markup
+    )
 
     return ROOM
 
 
-def choose_room(update: Update, context: CallbackContext) -> int:
+@log_action
+def cartridge_choose_room(update: Update, context: CallbackContext) -> int:
     floor_number = update.message.text
     buttons = [room for room in printers.registry if room[0] == floor_number]
 
-    reply_markup = ReplyKeyboardMarkup.from_column(
+    reply_markup = ReplyKeyboardMarkup.from_row(
         buttons,
         resize_keyboard=True,
     )
-    update.message.reply_text('Выберите кабинет', reply_markup=reply_markup)
+    update.message.reply_text(
+        'Выберите кабинет',
+        reply_markup=reply_markup
+    )
 
     return DEVICE
 
 
-def choose_device(update: Update, context: CallbackContext) -> int:
+@log_action
+def cartridge_choose_device(update: Update, context: CallbackContext) -> int:
     room_number = update.message.text
-    # TODO продумать структуру хренения элементов диалога
     context.user_data['room'] = room_number
     # TODO нужен рефакторинг
     if len(printers.registry[room_number]) == 1:
         printer_name = [key for key in printers.registry[room_number]][0]
-        update.message.reply_text(f'Замена картриджа в принтере {printer_name}', reply_markup=ReplyKeyboardRemove())
+        update.message.reply_text(f'Замена картриджа в принтере {printer_name}')
         context.user_data['printer'] = printer_name
-        choose_date(update, context)
+        cartridge_choose_date(update, context)
         return DONE
     else:
         buttons = [printer for printer in printers.registry[room_number]]
@@ -155,12 +206,16 @@ def choose_device(update: Update, context: CallbackContext) -> int:
             resize_keyboard=True,
         )
         context.user_data['printer'] = 1  # сигнал, что сюда надо записать название принтера в choose_date
-        update.message.reply_text('Выберите принтер', reply_markup=reply_markup)
+        update.message.reply_text(
+            'Выберите принтер',
+            reply_markup=reply_markup
+        )
 
     return DATE
 
 
-def choose_date(update: Update, context: CallbackContext) -> int:
+@log_action
+def cartridge_choose_date(update: Update, context: CallbackContext) -> int:
     if context.user_data['printer'] == 1:
         context.user_data['printer'] = update.message.text
     date_format = '%d.%m.%Y'
@@ -174,35 +229,46 @@ def choose_date(update: Update, context: CallbackContext) -> int:
         resize_keyboard=True,
     )
     update.message.reply_text(
-        'Выберите день или введите дату в формате ДД.ММ.ГГГГ', reply_markup=reply_markup
+        'Выберите день или введите дату в формате ДД.ММ.ГГГГ',
+        reply_markup=reply_markup
     )
 
     return DONE
 
 
-def cartridge_done(update: Update, context: CallbackContext) -> int:
+@log_action
+def cartridge_change_done(update: Update, context: CallbackContext) -> int:
     # TODO реализовать занесение в таблицу и правильную запись в лог
     room = context.user_data['room']
     printer = context.user_data['printer']
     date = update.message.text
     username = update.message.from_user.username
 
-    logger.info(f'Замена: {username=} {room=} {printer=} {date=}')
+    last_date, elapsed = printers.change_cartridge(room, printer, date)
+    logger.info(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
 
-    message = f'Замена картриджа\nКабинет: {room}\nПринтер: {printer}\nДата: {date}'
     update.message.reply_text(
-        message, reply_markup=ReplyKeyboardRemove()
+        'Замена картриджа\n'
+        f'Кабинет: {room}\n'
+        f'Принтер: {printer}\n'
+        f'Дата: {date}',
+        reply_markup=ReplyKeyboardRemove()
     )
+    update.message.reply_text(
+        f'Прошлая замена: {last_date}\n'
+        f'Ресурс картриджа в месяцах: {elapsed}'
+    )
+
+    context.user_data.clear()
 
     return ConversationHandler.END
 
 
+@log_action
 def cancel(update: Update, context: CallbackContext) -> int:
-    user = update.message.from_user
-    chat_id = update.message.chat_id
-    logger.info(f'{chat_id=} {user.first_name} отменил команду')  # TODO вытащить предыдущую команду
     update.message.reply_text(
-        'Ничего не делаем. Отмена', reply_markup=ReplyKeyboardRemove()
+        'Ничего не делаем. Отмена',
+        reply_markup=ReplyKeyboardRemove()
     )
 
     return ConversationHandler.END
