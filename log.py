@@ -11,6 +11,7 @@
 """
 
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import sys
 from pathlib import Path
 
@@ -25,11 +26,12 @@ LOG_FILE = 'log_service_bot.log'  # имя для общего лог-файла
 #   %(levelname)s - уровень сообщения (INFO, WARNING и т.п.)
 #   %(name)s - имя логгера
 #   %(filename)s - имя файла
+#   %(module)s - имя модуля
 #   %(funcName)s - имя функции
 #   %(lineno)d - номер строчки
 #   %(message)s - текст лог-сообщения
 FORMATTER = logging.Formatter(
-    f'%(asctime)s  [%(levelname)s]  %(name)s  (%(filename)s).%(funcName)s(%(lineno)d):  %(message)s'
+    f'%(asctime)s  [%(levelname)s] | (%(module)s) | %(message)s'
 )
 
 
@@ -37,9 +39,8 @@ FORMATTER = logging.Formatter(
 def get_logger(name: str) -> logging.Logger:
     """
     Возвращает логгер с тремя обработчиками сообщений:
-        console_handler - вывод в консоль (уровень INFO)
+        console_handler - вывод в консоль (уровень DEBUG)
         file_handler - вывод в файл с именем LOG_FILE (уровень INFO)
-        error_file_handler - вывод в файл с именем ERROR_LOG_FILE (уровень WARNING)
     Файлы будут расположены в папке ../LOG_FOLDER/
     """
 
@@ -47,7 +48,7 @@ def get_logger(name: str) -> logging.Logger:
     console_handler.setFormatter(FORMATTER)
     console_handler.setLevel(logging.DEBUG)
 
-    file_handler = logging.FileHandler(LOG_FOLDER / LOG_FILE)
+    file_handler = TimedRotatingFileHandler(LOG_FOLDER / LOG_FILE, 'W0')
     file_handler.setFormatter(FORMATTER)
     file_handler.setLevel(logging.INFO)
 
