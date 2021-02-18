@@ -244,9 +244,6 @@ def cartridge_change_done(update: Update, context: CallbackContext) -> int:
     date = update.message.text
     username = update.message.from_user.username
 
-    last_date, elapsed = printers.change_cartridge(room, printer, date)
-    logger.info(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
-
     update.message.reply_text(
         'Замена картриджа\n'
         f'Кабинет: {room}\n'
@@ -254,6 +251,10 @@ def cartridge_change_done(update: Update, context: CallbackContext) -> int:
         f'Дата: {date}',
         reply_markup=ReplyKeyboardRemove()
     )
+
+    last_date, elapsed = printers.change_cartridge(room, printer, date)
+    logger.info(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
+
     update.message.reply_text(
         f'Прошлая замена: {last_date}\n'
         f'Ресурс картриджа в месяцах: {elapsed}'
