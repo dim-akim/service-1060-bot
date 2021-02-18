@@ -16,6 +16,16 @@ class Printers:
     EVENT_COLUMN = 7  # Столбец с событиями - G (6)
     START_ROW = 5  # Первый ряд с данными (ряды 1-4 - заголовки)
 
+    AUDITORY_CELL = 'A2'  # Кабинет
+    MODEL_CELL = 'B2'  # Модель принтера
+    CARTRIDGE_CELL = 'B4'  # Модель картриджа
+    STATUS_CELL = 'B5'  # Состояние (Работает, Кончился картридж, Есть проблемы, В ремонте, Готов к выдаче
+    NAME_CELL = 'B7'  # Сетевое имя принтера
+    IP_ADDRESS_CELL = 'B8'  # IP-адрес принтера
+    SERIAL_NUM_CELL = 'B10'  # Серийный № принтера
+    INVENT_NUM_CELL = 'B11'  # Инвентарный № принтера
+    NUM_CELL = 'B12'  # Внутренний № принтера
+
     def __init__(self):
         self.table = client.open_by_key(PRINTERS_GSHEET_KEY)
         self.sheets_list = self.table.worksheets()
