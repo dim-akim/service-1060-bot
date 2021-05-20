@@ -35,7 +35,6 @@ FORMATTER = logging.Formatter(
 )
 
 
-# TODO сделать ротацию файлов
 def get_logger(name: str) -> logging.Logger:
     """
     Возвращает логгер с тремя обработчиками сообщений:
