@@ -1,18 +1,26 @@
 """
-Здесь собраны все настройки
+Здесь собираются настройки из файла settings.json
 """
+import json
 
-# Google-таблицы (их ключи)
-PRINTERS_GSHEET_KEY = '1WeyL-_Eoj5UYAVyF6YjEbndDV8wXfg821iUA_R7C5YE'  # Реестр Принтеров
-MACBOOK_GSHEET_KEY = '1wIIbgHjw_q0ntT8rnD9vwD5l08RO2VNLNKLXEbk6NBI'  # Реестр MacBook
-DEPO_GSHEET_KEY = '1UGHQ58Wb-uJc0dlhoz1nyhOaPQn77K17wOVidZ7XeDk'  # Реестр Depo
-LENOVO_GSHEET_KEY = '1_Snkjpcoci8fNwuYSdIYRT_oifYhEMl3SfKYKrL-aHE'  # Реестр Lenovo
-TECHNICS_GSHEET_KEY = '1jlsfgIuhpCjqaHlX9EUWH23WkdM-eA8Ojzo2sV7t7gg'  # Учет техники 1060
 
-# Telegram-бот
-BOT_TOKEN = '1609807876:AAFqznwwwpxGgbIYkNDOQ6slAdXM8oUXg20'
-ADMIN_IDS = [
-    262388958,
-]
+settings_file = 'key/settings.json'
+with open(settings_file) as file:
+    # Google-таблицы (их ключи)
+    settings = json.load(file)
+    PRINTERS_GSHEET_KEY = settings['PRINTERS_GSHEET_KEY']  # Реестр Принтеров
+    MACBOOK_GSHEET_KEY = settings['MACBOOK_GSHEET_KEY']  # Реестр MacBook
+    DEPO_GSHEET_KEY = settings['DEPO_GSHEET_KEY']  # Реестр Depo
+    LENOVO_GSHEET_KEY = settings['LENOVO_GSHEET_KEY']  # Реестр Lenovo
+    TECHNICS_GSHEET_KEY = settings['TECHNICS_GSHEET_KEY']  # Учет техники 1060
 
-ECHO_TOKEN = '1207559312:AAHr0Go-3LMv2VC8PQ9042g2tV4o3LV577o'
+    # Telegram-бот
+    BOT_TOKEN = settings['BOT_TOKEN']
+    ADMIN_IDS = settings['ADMIN_IDS']
+
+    ECHO_TOKEN = settings['ECHO_TOKEN']
+
+
+if __name__ == '__main__':
+    print(PRINTERS_GSHEET_KEY)
+    print(ADMIN_IDS)
