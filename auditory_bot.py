@@ -1,12 +1,11 @@
 import functools
-import datetime
 from telegram import Update
 from telegram.ext import Updater, CallbackContext, CommandHandler, MessageHandler, Filters
-from settings import ECHO_TOKEN
 from log import get_logger
+from settings import ECHO_TOKEN  # Здесь надо импортировать токен бота
 
 
-logger = get_logger(__name__)  # TODO переделать file_handler
+logger = get_logger(__name__)  # TODO переделать file_handler, обновление по месяцам
 
 
 def log_action(command):
@@ -47,7 +46,7 @@ def main() -> None:
     dispatcher.add_handler(CommandHandler('gethistory', get_history))
 
     # На любой другой текст выдаем сообщение help
-    dispatcher.add_handler(MessageHandler(Filters.all, do_help))
+    dispatcher.add_handler(MessageHandler(Filters.text, do_help))
 
     # Запускаем бота
     updater.start_polling()
@@ -73,7 +72,7 @@ def take_key(update: Update, context: CallbackContext) -> None:
     context.chat_data['key_taken'] = True
     context.chat_data['user_id'] = user.id
     context.chat_data['user'] = f'{user.first_name} {user.last_name}'
-
+    # TODO Вынести получение имени и фамилии в отдельную функцию. Нужен фильтр, если фамилия None
     reply = f'Ключ взял {user.first_name} {user.last_name}'
     logger.debug(reply)
     update.message.reply_text(text=reply)
