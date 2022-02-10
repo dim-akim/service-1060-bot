@@ -61,10 +61,9 @@ class Scores:
 
 
 if __name__ == '__main__':
+    will_be_skipped = ('10н', '10о')
     for grade in CLASSES:
-        if grade in ('10н', '10о'):
-            continue
-        else:
+        if grade not in will_be_skipped:
             scores = Scores(grade)
             print(f'{grade}: {scores.table.url}')
             # ToDo сформировать письмо?
