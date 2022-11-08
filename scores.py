@@ -18,7 +18,7 @@ class Scores:
     folder_id: str
     sheet_to_be_kept: str
 
-    _range: str = 'A1:AF55'
+    _range: str = 'A1:AU55'
     _importrange_link = '=IMPORTRANGE("https://docs.google.com/spreadsheets/d/{}";"{}!{}")'
 
     def __init__(self, sheet_to_be_kept: str):
@@ -61,7 +61,7 @@ class Scores:
 
 
 if __name__ == '__main__':
-    will_be_skipped = ('10н', '10о')
+    will_be_skipped = ()
     for grade in CLASSES:
         if grade not in will_be_skipped:
             scores = Scores(grade)
