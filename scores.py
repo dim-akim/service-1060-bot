@@ -6,10 +6,11 @@ from settings import *
 client = pygsheets.authorize(service_file='key/python-waldorf-4f0f67808d79.json')
 template = client.open_by_key(SCORES_GSHEET_KEY)
 # ToDo найти папку из свойств страницы. Использовать client.drive.
-folder_id = '17yh08lEjH-cKy4XkEFRyIZkJJP_iImax'  # Admin 1060/Общие документы/2021-2022
+folder_id = '1yXMH0WdCi6cSNhTGvU3LFz-mcNo3byVg'  # Admin 1060/Общие документы/2022-2023
 
-CLASSES = [f'{grade}{letter}' for grade in '5678' for letter in 'ноп']
-CLASSES += [f'{grade}{letter}' for grade in (9, 10, 11) for letter in 'но']
+CLASSES = [f'{grade}{letter}' for grade in '6789' for letter in 'ноп']
+CLASSES += ['10н']
+CLASSES += [f'{grade}{letter}' for grade in (11,) for letter in 'но']
 
 
 class Scores:
@@ -61,7 +62,7 @@ class Scores:
 
 
 if __name__ == '__main__':
-    will_be_skipped = ()
+    will_be_skipped = ('5н', '5о', '5п')
     for grade in CLASSES:
         if grade not in will_be_skipped:
             scores = Scores(grade)
