@@ -11,6 +11,7 @@
 """
 
 import logging
+import logging.config
 from logging.handlers import TimedRotatingFileHandler
 import sys
 from pathlib import Path
@@ -47,13 +48,15 @@ def get_logger(name: str) -> logging.Logger:
     console_handler.setFormatter(FORMATTER)
     console_handler.setLevel(logging.DEBUG)
 
-    file_handler = TimedRotatingFileHandler(LOG_FOLDER / LOG_FILE, 'W0')
+    # file_handler = TimedRotatingFileHandler(LOG_FOLDER / LOG_FILE, 'D30')
+    file_handler = logging.FileHandler(LOG_FOLDER / LOG_FILE)
     file_handler.setFormatter(FORMATTER)
     file_handler.setLevel(logging.INFO)
 
-    logger = logging.getLogger(name)
+    logger: logging.Logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
+
 
     return logger

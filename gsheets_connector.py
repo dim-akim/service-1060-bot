@@ -91,8 +91,11 @@ class Printers:
 if __name__ == '__main__':
 
     printers = Printers()
-    # for item in printers.registry:
-    #     print(item, printers.registry[item])
+    for item in printers.registry:
+        print(item, printers.registry[item])
+    buttons = [printer for printer in printers.registry['102']]
+    printer_name, = printers.registry['102']
+    print(buttons)
 
     sheet = printers.sheets_list[4]
     # column = sheet.get_col(printers.CHANGE_COLUMN)

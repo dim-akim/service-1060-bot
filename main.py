@@ -10,13 +10,17 @@ chat_id администраторов можно задать в файле set
     TODO Создание и подтверждение заявки на урок или мероприятие в Актовом зале
     TODO Создание заявки на техническое обслуживание
 
-Переход на Python версии 3.11.1 и библиотеку python-telegram-bot версии 20.0 (асинхронность)
+Переход на Python версии 3.11.1 и библиотеку python-telegram-bot версии 20.1 (асинхронность)
 """
-import functools
-import datetime
-from telegram import Update
+
+from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-from settings import ECHO_TOKEN, ADMIN_IDS
+
+from settings import ECHO_TOKEN
+from utils.log import get_logger
+
+
+logger = get_logger(__name__)  # Создаем логгер для обработки событий. Сообщения DEBUG - только в консоль
 
 
 def run_1060_bot():
@@ -33,4 +37,26 @@ async def hello(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Hello {update.effective_user.first_name}')
 
 
+async def do_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Выводит сообщение о доступных командах.
+    Команды собираются на основе функций register_<some_role>_handlers TODO доработать
+    """
+    # TODO переделать, продумать два уровня команд - для учителя и для админа
+    chat_id = update.message.chat_id
+    logger.debug(f'{chat_id=} обратился за помощью')
 
+    first_name = update.message.from_user.first_name
+    last_name = update.message.from_user.last_name
+    reply_lines = [
+        f'Привет, {first_name} {last_name}',
+        'Я умею реагировать на следующие команды:',
+        '/cartridge - начать диалог по замене картриджей (поступление пока в разработке)',
+        '/cancel - закончить диалог на этом этапе',
+        '/help - мануал, который ты сейчас читаешь.',
+    ]
+    text = '\n'.join(reply_lines)
+    await update.message.reply_text(
+        text,
+        reply_markup=ReplyKeyboardRemove()
+    )

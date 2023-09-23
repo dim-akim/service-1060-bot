@@ -1,9 +1,9 @@
 import functools
 import datetime
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Updater, CallbackContext, CommandHandler, MessageHandler, Filters, ConversationHandler
 from settings import BOT_TOKEN, ADMIN_IDS
-from log import get_logger
+from utils.log import get_logger
 from gsheets_connector import Printers
 
 logger = get_logger(__name__)  # Создаем логгер для обработки событий. Сообщения DEBUG - только в консоль
