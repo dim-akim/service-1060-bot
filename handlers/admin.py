@@ -256,9 +256,10 @@ async def cartridge_change_done(update: Update, context: ContextTypes.DEFAULT_TY
         date = update.message.text
     room = context.user_data['room']
     printer = context.user_data['printer']
-    username = update.message.from_user.username
+    username = update.effective_user.username
 
-    await update.message.reply_text(
+    await context.bot.send_message(
+        update.effective_chat.id,
         'Замена картриджа\n'
         f'Кабинет: {room}\n'
         f'Принтер: {printer}\n'
@@ -266,13 +267,14 @@ async def cartridge_change_done(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=ReplyKeyboardRemove()
     )
 
-    await update.message.reply_chat_action(ChatAction.TYPING)
+    await context.bot.send_chat_action(update.effective_message.chat_id, ChatAction.TYPING)
     # TODO сделать корутиной запись в таблицу
     last_date, elapsed = printers.change_cartridge(room, printer, date)
     print(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
     # logger.info(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
 
-    await update.message.reply_text(
+    await context.bot.send_message(
+        update.effective_chat.id,
         f'Прошлая замена: {last_date}\n'
         f'Ресурс картриджа в месяцах: {elapsed}'
     )
