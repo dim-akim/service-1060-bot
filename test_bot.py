@@ -10,7 +10,7 @@ import logging
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
-from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
+from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP, DAY
 from settings import ECHO_TOKEN
 # from utils.log import get_logger
 import handlers.admin as handlers_a
@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 # logger = get_logger(__name__)  # Создаем логгер для обработки событий. Сообщения DEBUG - только в консоль
 
 
+class MyCalendar(DetailedTelegramCalendar):
+    first_step = DAY
+
+
 def run_1060_bot():
     """Запускает бота @help_admin_1060_bot
     """
@@ -31,21 +35,22 @@ def run_1060_bot():
     handlers_a.register_admin_handlers(app)
     # app.add_handler(CommandHandler("hello", handlers_a.cartridge_choose_action))
     app.add_handler(CommandHandler('calendar', call_calendar))
-    app.add_handler(CallbackQueryHandler(DetailedTelegramCalendar.func()))
+    app.add_handler(CallbackQueryHandler(MyCalendar.func()))
     app.add_handler(MessageHandler(filters.Text(), echo))
 
     app.run_polling()
 
 
 async def call_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    calendar, step = DetailedTelegramCalendar(locale='ru').build()
+    calendar, step = MyCalendar(locale='ru').build()
     await update.message.reply_text(f'Выберите {LSTEP[step]}', reply_markup=calendar)
 
 
 async def calendar_react(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     # await query.answer()
-    result, key, step = DetailedTelegramCalendar(locale='ru').process(query.data)
+    result, key, step = MyCalendar(locale='ru').process(query.data)
+    print(f'{result=} {key=} {step=}')
     if not result and key:
         await query.edit_message_text(f"Выберите {LSTEP[step]}", reply_markup=key)
     elif result:
