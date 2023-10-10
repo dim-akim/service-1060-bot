@@ -39,13 +39,13 @@ def register_admin_handlers(app: Application):
                 # ^ means "start of line/string"
                 # $ means "end of line/string"
                 # So ^ABC$ will only allow 'ABC'
-                CallbackQueryHandler(cartridge_choose_floor, pattern='^' + 'Замена' + '$'),
-                CallbackQueryHandler(cartridge_incoming, pattern='^' + 'Привоз' + '$'),
+                CallbackQueryHandler(cartridge_choose_floor, pattern='^' 'Замена' '$'),
+                CallbackQueryHandler(cartridge_incoming, pattern='^' 'Привоз' '$'),
                 MessageHandler(filters.Text(), cartridge_choose_floor),
             ],
             ROOM: [
                 cancel_handler,
-                CallbackQueryHandler(cartridge_choose_room, pattern='^' + 'change_[12345]_floor' + '$'),
+                CallbackQueryHandler(cartridge_choose_room, pattern='^' 'change_[12345]_floor' '$'),
                 MessageHandler(filters.Text(), cartridge_choose_room),
             ],
             DEVICE: [
@@ -95,7 +95,6 @@ async def cartridge_choose_floor(update: Update, context: ContextTypes.DEFAULT_T
     Первый этап из диалога по замене картриджей: **Этаж**-Кабинет-Принтер-Дата-Готово.
 
     Дает пользователю выбрать этаж, на котором стоит принтер.
-
     Заменяет кнопки, которые были на полученном сообщении
 
     :return: Состояние ROOM - выбор кабинета
@@ -111,8 +110,10 @@ async def cartridge_choose_floor(update: Update, context: ContextTypes.DEFAULT_T
         '5': 'change_5_floor'
     }
     reply_markup = make_inline_keyboard(buttons)
+    # TODO добавить кнопки "Назад" и "Отмена", нужна функция
 
     await query.edit_message_text(
+        'Замена картриджа\n'
         'Выберите этаж',
         reply_markup=reply_markup
     )
@@ -129,18 +130,19 @@ async def cartridge_choose_room(update: Update, context: ContextTypes.DEFAULT_TY
     :return: Состояние DEVICE - выбор принтера
     """
     query = update.callback_query
-    await query.answer()
     floor_number = query.data[7]
     buttons = [room for room in printers.registry if room[0] == floor_number]
-    print(update.effective_chat.id)
     if len(buttons) == 0:
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=f'На {floor_number} этаже не зарегистрировано работающих принтеров'
-        )
+        await query.answer(f'На {floor_number} этаже не зарегистрировано работающих принтеров')
+        # await context.bot.send_message(
+        #     chat_id=update.effective_chat.id,
+        #     text=f'На {floor_number} этаже не зарегистрировано работающих принтеров'
+        # )
         return ROOM
+    await query.answer()
     reply_markup = make_inline_keyboard(buttons)
     await query.edit_message_text(
+        'Замена картриджа\n'
         'Выберите кабинет',
         reply_markup=reply_markup
     )
@@ -170,6 +172,8 @@ async def cartridge_choose_device(update: Update, context: ContextTypes.DEFAULT_
         reply_markup = make_inline_keyboard(buttons)
         context.user_data['printer'] = 1  # сигнал, что сюда надо записать название принтера в choose_date
         await query.edit_message_text(
+            'Замена картриджа\n'
+            f'Кабинет: {room_number}\n'
             'Выберите принтер',
             reply_markup=reply_markup
         )
@@ -202,9 +206,11 @@ async def cartridge_choose_date(update: Update, context: ContextTypes.DEFAULT_TY
         f'Сегодня {today}': today,
         f'Вчера {yesterday}': yesterday,
     }
-    reply_markup = make_inline_keyboard(buttons)
+    reply_markup = make_inline_keyboard(buttons, cancel_btn=True)
     text = [
-        f'Замена картриджа в принтере {context.user_data["printer"]}',
+        'Замена картриджа\n'
+        f'Кабинет: {context.user_data["room"]}',
+        f'Принтер: {context.user_data["printer"]}',
         'Выберите день или введите дату в формате ДД.ММ.ГГГГ'
     ]
     text = '\n'.join(text)

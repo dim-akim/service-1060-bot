@@ -8,8 +8,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMa
 def make_inline_keyboard(
         labels: list | tuple | dict,
         max_columns: int = 3,
-        back_btn = None,
-        cancel_btn = False
+        back_btn=None,
+        cancel_btn: bool = False
 ):
     """
     Создает Inline-клавиатуру из переданной коллекции.
@@ -32,10 +32,13 @@ def make_inline_keyboard(
     if len(buttons) <= max_columns:
         return InlineKeyboardMarkup.from_row(buttons)
 
-    # last_row = [InlineKeyboardButton('< Назад', callback_data=back_btn)] if back_btn
-    # last_row += [InlineKeyboardButton('Отмена', callback_data='cancel') if cancel_btn]
+    keyboard = [buttons[i:i + max_columns] for i in range(0, len(buttons), max_columns)]
 
-    keyboard = [buttons[i:i+max_columns] for i in range(0, len(buttons), max_columns)]
+    last_row = [InlineKeyboardButton('< Назад', callback_data=back_btn)] if back_btn else []
+    last_row += [InlineKeyboardButton('Отмена', callback_data='cancel')] if cancel_btn else []
+    keyboard.append(last_row)
+    print(keyboard)
+
     return InlineKeyboardMarkup(keyboard)
 
 
@@ -73,4 +76,4 @@ def make_reply_keyboard(
 
 
 if __name__ == '__main__':
-    make_inline_keyboard(['1', '2', '3', '4', '5', '6', '7'], 4)
+    make_inline_keyboard(['1', '2', '3', '4', '5', '6', '7'], 4, cancel_btn=True)

@@ -10,6 +10,7 @@ import logging
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
+from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 from settings import ECHO_TOKEN
 # from utils.log import get_logger
 import handlers.admin as handlers_a
@@ -29,16 +30,35 @@ def run_1060_bot():
 
     handlers_a.register_admin_handlers(app)
     # app.add_handler(CommandHandler("hello", handlers_a.cartridge_choose_action))
+    app.add_handler(CommandHandler('calendar', call_calendar))
+    app.add_handler(CallbackQueryHandler(DetailedTelegramCalendar.func()))
     app.add_handler(MessageHandler(filters.Text(), echo))
 
     app.run_polling()
+
+
+async def call_calendar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    calendar, step = DetailedTelegramCalendar(locale='ru').build()
+    await update.message.reply_text(f'Выберите {LSTEP[step]}', reply_markup=calendar)
+
+
+async def calendar_react(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    # await query.answer()
+    result, key, step = DetailedTelegramCalendar(locale='ru').process(query.data)
+    if not result and key:
+        await query.edit_message_text(f"Выберите {LSTEP[step]}", reply_markup=key)
+    elif result:
+        await query.edit_message_text(f"Вы выбрали {result}")
 
 
 async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     userid = update.message.from_user.id
     text = [
         'Привет! Ты находишься в режиме тестирования.',
-        'Мне известна команда /cartridge.',
+        'Мне известны команды:'
+        '/cartridge - начать диалог по замене картриджей.'
+        '/calendar - тестирование календаря.',
         'Нажми и увидишь, что будет.',
         f'На всякий случай, твой {userid=}'
     ]
