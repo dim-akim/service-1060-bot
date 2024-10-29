@@ -1,6 +1,6 @@
 """
 Модуль содержит функции, которые создают разные клавиатуры для Telegram-бота.
-Используется библиотека python-telegram-bot версии 20.1
+Используется библиотека python-telegram-bot версии 20.6
 """
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
 

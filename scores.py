@@ -1,10 +1,10 @@
 import pygsheets
-from settings import *
+from settings import Config
 
 
 # Клиент - главный класс для работы с Google-документами. При создании происходит авторизация
 client = pygsheets.authorize(service_file='key/python-waldorf-4f0f67808d79.json')
-template = client.open_by_key(SCORES_GSHEET_KEY)
+template = client.open_by_key(Config.scores_gsheet_key)
 # ToDo найти папку из свойств страницы. Использовать client.drive.
 folder_id = '1yXMH0WdCi6cSNhTGvU3LFz-mcNo3byVg'  # Admin 1060/Общие документы/2022-2023
 

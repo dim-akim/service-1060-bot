@@ -1,4 +1,5 @@
 import datetime
+import logging
 
 import telegram
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
@@ -6,18 +7,18 @@ from telegram.ext import CommandHandler, MessageHandler, ConversationHandler, Ca
 from telegram.ext import ContextTypes, Application, filters
 from telegram.constants import ChatAction
 
-# from utils.log import get_logger
 from gsheets_connector import Printers
-from utils import validators
+from utils import valid
 from utils.keyboards import make_inline_keyboard
+from utils.inline_calendar import MyCalendar, RU_STEP
 
-# logger = get_logger(__name__)  # Создаем логгер для обработки событий. Сообщения DEBUG - только в консоль
+logger = logging.getLogger(__name__)
 # TODO refactor - класс Printer, в котором будет информация о конкретном принтере
 printers = Printers()  # Экземпляр класса Printers, в котором держатся страницы Реестра принтеров
 FLOOR, ROOM, DEVICE, DATE, DONE = range(5)  # Состояния для диалога по картриджам
 
 
-def register_admin_handlers(app: Application):
+def register(app: Application):
     """
     Добавляет боту следующие обработчики:
         cartridge_conv_handler - диалог по смене картриджа в одном из принтеров,
@@ -60,9 +61,7 @@ def register_admin_handlers(app: Application):
             ],
             DONE: [
                 cancel_handler,
-                CallbackQueryHandler(cartridge_change_done),  # TODO нужен паттерн
-                MessageHandler(filters.Regex(validators.DATE), cartridge_change_done),
-                MessageHandler(filters.Text(), cartridge_wrong_date),
+                CallbackQueryHandler(calendar_react, pattern=MyCalendar.func()),
             ],
         },
         fallbacks=[cancel_handler]
@@ -80,11 +79,10 @@ async def cartridge_choose_action(update: Update, context: ContextTypes.DEFAULT_
     :return: :obj:`int`: Состояние FLOOR - выбор этажа
     """
     buttons = ['Замена', 'Привоз']
-    reply_markup = make_inline_keyboard(buttons)
-    # TODO запомнить id сообщения, чтобы его можно было потом редактировать
+    # TODO запомнить id сообщения, чтобы его можно было потом редактировать ??
     await update.message.reply_text(
         'Что делаем с картриджами?',
-        reply_markup=reply_markup
+        reply_markup=make_inline_keyboard(buttons)
     )
 
     return FLOOR
@@ -109,13 +107,14 @@ async def cartridge_choose_floor(update: Update, context: ContextTypes.DEFAULT_T
         '4': 'change_4_floor',
         '5': 'change_5_floor'
     }
-    reply_markup = make_inline_keyboard(buttons)
-    # TODO добавить кнопки "Назад" и "Отмена", нужна функция
-
+    text = [
+        'Замена картриджа\n',
+        f'Этаж: выберите'
+    ]
+    text = '\n'.join(text)
     await query.edit_message_text(
-        'Замена картриджа\n'
-        'Выберите этаж',
-        reply_markup=reply_markup
+        text,
+        reply_markup=make_inline_keyboard(buttons)  # TODO добавить кнопки "Назад" и "Отмена"
     )
 
     return ROOM
@@ -132,19 +131,19 @@ async def cartridge_choose_room(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     floor_number = query.data[7]
     buttons = [room for room in printers.registry if room[0] == floor_number]
-    if len(buttons) == 0:
+    if not buttons:
         await query.answer(f'На {floor_number} этаже не зарегистрировано работающих принтеров')
-        # await context.bot.send_message(
-        #     chat_id=update.effective_chat.id,
-        #     text=f'На {floor_number} этаже не зарегистрировано работающих принтеров'
-        # )
         return ROOM
+
     await query.answer()
-    reply_markup = make_inline_keyboard(buttons)
+    text = [
+        'Замена картриджа\n',
+        f'Кабинет: выберите'
+    ]
+    text = '\n'.join(text)
     await query.edit_message_text(
-        'Замена картриджа\n'
-        'Выберите кабинет',
-        reply_markup=reply_markup
+        text,
+        reply_markup=make_inline_keyboard(buttons)
     )
 
     return DEVICE
@@ -165,17 +164,20 @@ async def cartridge_choose_device(update: Update, context: ContextTypes.DEFAULT_
     context.user_data['room'] = room_number
     buttons = [printer for printer in printers.registry[room_number]]
     if len(buttons) == 1:
+        # Пропускаем диалог выбора принтера, если на этаже он только один
         context.user_data['printer'] = buttons[0]
         return await cartridge_choose_date(update, context)
 
     else:
-        reply_markup = make_inline_keyboard(buttons)
-        context.user_data['printer'] = 1  # сигнал, что сюда надо записать название принтера в choose_date
+        text = [
+            'Замена картриджа\n',
+            f'Кабинет: {room_number}',
+            f'Принтер: выберите'
+        ]
+        text = '\n'.join(text)
         await query.edit_message_text(
-            'Замена картриджа\n'
-            f'Кабинет: {room_number}\n'
-            'Выберите принтер',
-            reply_markup=reply_markup
+            text,
+            reply_markup=make_inline_keyboard(buttons)
         )
 
     return DATE
@@ -191,59 +193,64 @@ async def cartridge_choose_date(update: Update, context: ContextTypes.DEFAULT_TY
     """
     query = update.callback_query
     await query.answer()
-    if context.user_data['printer'] == 1:
+    if not context.user_data.get('printer'):
         context.user_data['printer'] = query.data
 
-    # TODO вынести в отдельную функцию
-    # TODO сделать календарь
-    date_format = '%d.%m.%Y'
-    day = datetime.timedelta(days=1)
-    today = datetime.date.today()
-    yesterday = today - day
-    today, yesterday = [day.strftime(date_format) for day in (today, yesterday)]
-
-    buttons = {
-        f'Сегодня {today}': today,
-        f'Вчера {yesterday}': yesterday,
-    }
-    reply_markup = make_inline_keyboard(buttons, cancel_btn=True)
+    calendar, step = MyCalendar(locale='Ru', max_date=datetime.date.today()).build()
     text = [
-        'Замена картриджа\n'
+        'Замена картриджа\n',
         f'Кабинет: {context.user_data["room"]}',
         f'Принтер: {context.user_data["printer"]}',
-        'Выберите день или введите дату в формате ДД.ММ.ГГГГ'
+        f'Дата: Выберите {RU_STEP[step]}'
     ]
     text = '\n'.join(text)
-    dialog = await query.edit_message_text(
-        text,
-        reply_markup=reply_markup
-    )
+    dialog = await query.edit_message_text(text, reply_markup=calendar)
     context.user_data['dialog'] = dialog
     return DONE
 
 
-async def cartridge_wrong_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """
-    Четвертый этап из диалога по замене картриджей: Этаж-Кабинет-Принтер-**Дата**-Готово.
+async def calendar_react(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    result, key, step = MyCalendar(locale='Ru', max_date=datetime.date.today()).process(query.data)
+    if not result and key:
+        await query.answer()
+        text = [
+            'Замена картриджа\n',
+            f'Кабинет: {context.user_data["room"]}',
+            f'Принтер: {context.user_data["printer"]}',
+            f'Дата: Выберите {RU_STEP[step]}'
+        ]
+        text = '\n'.join(text)
+        await query.edit_message_text(text, reply_markup=key)
+        return DONE
+    elif result:
+        context.user_data['date'] = result
+        return await cartridge_change_done(update, context)
 
-    Повторно запрашивает дату от пользователя в случае, если тот ее указал не по формату
 
-    :return: Состояние DONE - регистрация замены в таблице
-    """
-    chat_id = update.message.chat_id
-    dialog: telegram.Message = context.user_data['dialog']
-    text = dialog.text
-    reply_markup = dialog.reply_markup
-    await update.message.delete()
-    await update.message.reply_text(
-        'Неверный формат даты!'
-    )
-    # new_dialog = await update.message.reply_text(
-    #     text=text,
-    #     reply_markup=reply_markup
-    # )
-    # context.user_data['dialog'] = new_dialog
-    return DONE
+# async def cartridge_wrong_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+#     """
+#     Четвертый этап из диалога по замене картриджей: Этаж-Кабинет-Принтер-**Дата**-Готово.
+#
+#     Повторно запрашивает дату от пользователя в случае, если тот ее указал не по формату
+#
+#     :return: Состояние DONE - регистрация замены в таблице
+#     """
+#     chat_id = update.message.chat_id
+#     dialog: telegram.Message = context.user_data['dialog']
+#     text = dialog.text
+#     reply_markup = dialog.reply_markup
+#     await update.message.delete()
+#     await update.callback_query.answer('Неверный формат даты!')
+#     await update.message.reply_text(
+#         'Неверный формат даты!'
+#     )
+#     # new_dialog = await update.message.reply_text(
+#     #     text=text,
+#     #     reply_markup=reply_markup
+#     # )
+#     # context.user_data['dialog'] = new_dialog
+#     return DONE
 
 
 async def cartridge_change_done(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -255,29 +262,24 @@ async def cartridge_change_done(update: Update, context: ContextTypes.DEFAULT_TY
     :return: Состояние ConversationHandler.END
     """
     # TODO реализовать занесение в таблицу и правильную запись в лог
-    if update.callback_query:
-        await update.callback_query.answer()
-        date = update.callback_query.data
-    else:
-        date = update.message.text
+    date = context.user_data['date']
     room = context.user_data['room']
     printer = context.user_data['printer']
-    username = update.effective_user.username
-
-    await context.bot.send_message(
-        update.effective_chat.id,
-        'Замена картриджа\n'
-        f'Кабинет: {room}\n'
-        f'Принтер: {printer}\n'
-        f'Дата: {date}',
-        reply_markup=ReplyKeyboardRemove()
-    )
+    query = update.callback_query
+    text = [
+        'Замена картриджа\n',
+        f'Кабинет: {room}',
+        f'Принтер: {printer}',
+        f'Дата: {date}'
+    ]
+    text = '\n'.join(text)
+    await query.edit_message_text(text)
 
     await context.bot.send_chat_action(update.effective_message.chat_id, ChatAction.TYPING)
     # TODO сделать корутиной запись в таблицу
     last_date, elapsed = printers.change_cartridge(room, printer, date)
-    print(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
-    # logger.info(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
+    username = update.effective_user.username
+    logger.info(f'[ЗАМЕНА] {username=} {room=} {printer=} {date=}')
 
     await context.bot.send_message(
         update.effective_chat.id,
@@ -286,7 +288,6 @@ async def cartridge_change_done(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     context.user_data.clear()
-
     return ConversationHandler.END
 
 
@@ -308,7 +309,7 @@ async def cartridge_incoming(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Прерывает любой из диалогов на любом этапе."""
-    # TODO очистить словарь состояний
+    context.user_data.clear()
     await update.message.reply_text(
         'Ничего не делаем. Отмена',
         reply_markup=ReplyKeyboardRemove()

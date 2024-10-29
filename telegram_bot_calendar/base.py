@@ -104,6 +104,8 @@ class TelegramCalendar:
                 callback = update.callback_query
 
             start = CB_CALENDAR + "_" + str(calendar_id)
+            if isinstance(callback, str):
+                return callback.startswith(start)
             return callback.decode("utf-8").startswith(start) if telethon else callback.data.startswith(start)
 
         return inn

@@ -9,26 +9,32 @@ chat_id администраторов можно задать в файле set
     (СисАдмин) Создание индивидуальных таблиц с оценками для рассылки по классам
     TODO Создание и подтверждение заявки на урок или мероприятие в Актовом зале
     TODO Создание заявки на техническое обслуживание
-
-Переход на Python версии 3.11.1 и библиотеку python-telegram-bot версии 20.5 (асинхронность)
 """
+import logging
 
 from telegram import Update, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-from settings import ECHO_TOKEN
-from utils.log import get_logger
+from settings import Config
+from utils.log import file_handler, console_handler
+import handlers.admin as admin_handlers
 
 
-logger = get_logger(__name__)  # Создаем логгер для обработки событий. Сообщения DEBUG - только в консоль
+logging.basicConfig(
+    format="%(asctime)s | %(levelname)s | %(name)s - %(message)s (%(filename)s:%(lineno)d)",
+    level=logging.INFO,
+    handlers=[file_handler, console_handler]
+)
+logger = logging.getLogger(__name__)
 
 
 def run_1060_bot():
     """Запускает бота @help_admin_1060_bot
     """
-    app = ApplicationBuilder().token(ECHO_TOKEN).build()
+    app = ApplicationBuilder().token(Config.bot_token).build()
 
-    app.add_handler(CommandHandler("hello", hello))
+    app.add_handler(CommandHandler(["start", "help"], do_help))
+    admin_handlers.register(app)
 
     app.run_polling()
 
@@ -44,10 +50,10 @@ async def do_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     # TODO переделать, продумать два уровня команд - для учителя и для админа
     chat_id = update.message.chat_id
-    logger.debug(f'{chat_id=} обратился за помощью')
-
     first_name = update.message.from_user.first_name
     last_name = update.message.from_user.last_name
+
+    logger.info(f'{chat_id=} {first_name} {last_name} обратился за помощью')
     reply_lines = [
         f'Привет, {first_name} {last_name}',
         'Я умею реагировать на следующие команды:',
@@ -55,8 +61,11 @@ async def do_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         '/cancel - закончить диалог на этом этапе',
         '/help - мануал, который ты сейчас читаешь.',
     ]
-    text = '\n'.join(reply_lines)
     await update.message.reply_text(
-        text,
+        text='\n'.join(reply_lines),
         reply_markup=ReplyKeyboardRemove()
     )
+
+
+if __name__ == '__main__':
+    run_1060_bot()

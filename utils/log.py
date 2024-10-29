@@ -32,8 +32,16 @@ LOG_FILE = 'log_service_bot.log'  # имя для общего лог-файла
 #   %(lineno)d - номер строчки
 #   %(message)s - текст лог-сообщения
 FORMATTER = logging.Formatter(
-    f'%(asctime)s  [%(levelname)s] | (%(module)s) | %(message)s'
+    "%(asctime)s | %(levelname)s | %(name)s - %(message)s"
 )
+
+file_handler = logging.FileHandler(LOG_FOLDER / LOG_FILE)
+# file_handler.setFormatter(FORMATTER)
+file_handler.setLevel(logging.INFO)
+
+console_handler = logging.StreamHandler(sys.stdout)
+# console_handler.setFormatter(FORMATTER)
+console_handler.setLevel(logging.INFO)
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -44,19 +52,32 @@ def get_logger(name: str) -> logging.Logger:
     Файлы будут расположены в папке ../LOG_FOLDER/
     """
 
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(FORMATTER)
-    console_handler.setLevel(logging.DEBUG)
-
-    # file_handler = TimedRotatingFileHandler(LOG_FOLDER / LOG_FILE, 'D30')
-    file_handler = logging.FileHandler(LOG_FOLDER / LOG_FILE)
-    file_handler.setFormatter(FORMATTER)
-    file_handler.setLevel(logging.INFO)
-
     logger: logging.Logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
 
-
     return logger
+
+
+class CustomFormatter(logging.Formatter):
+
+    grey = "\x1b[38;20m"
+    yellow = "\x1b[33;20m"
+    red = "\x1b[31;20m"
+    bold_red = "\x1b[31;1m"
+    reset = "\x1b[0m"
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
+
+    FORMATS = {
+        logging.DEBUG: grey + format + reset,
+        logging.INFO: grey + format + reset,
+        logging.WARNING: yellow + format + reset,
+        logging.ERROR: red + format + reset,
+        logging.CRITICAL: bold_red + format + reset
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno)
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
